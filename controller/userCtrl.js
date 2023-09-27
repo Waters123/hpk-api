@@ -6,12 +6,37 @@ const { generateRefreshToken } = require("../config/refreshToke");
 const jwt = require("jsonwebtoken");
 
 const createUser = asyncHandler(async (req, res) => {
-  const email = req.body.email;
-  const findUser = await User.findOne({ email: email });
+  const { email, password } = req.body;
+  let findUser = await User.findOne({ email: email });
   if (!findUser) {
     // create a new User
     const newUser = await User.create(req.body);
-    res.json(newUser);
+    let findUser = await User.findOne({ email });
+    if (findUser && (await findUser.isPasswordMatched(password))) {
+      const refreshToken = await generateRefreshToken(newUser?._id);
+      const updateUser = await User.findByIdAndUpdate(
+        newUser?._id,
+        {
+          refreshToken: refreshToken,
+        },
+        { new: true }
+      );
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        path: "/",
+        maxAge: 72 * 60 * 60 * 1000,
+        secure: true,
+      });
+      res.json({
+        _id: newUser?._id,
+        firstName: newUser?.firstName,
+        lastName: newUser?.lastName,
+        email: newUser?.email,
+        mobile: newUser?.mobile,
+        role: newUser?.role,
+        token: generateToken(newUser?._id),
+      });
+    }
   } else {
     throw new Error("User already Exists");
   }

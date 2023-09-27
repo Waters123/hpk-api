@@ -14,7 +14,7 @@ const cookieSession = require("cookie-session");
 dbConnect();
 
 app.use(morgan("dev"));
-app.use(cors({ origin: "http://localhost:3011", credentials: true }));
+app.use(cors({ origin: process.env.CORS_WHITELIST, credentials: true }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(coockieParser());
