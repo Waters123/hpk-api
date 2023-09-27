@@ -18,7 +18,7 @@ app.use(cors({ origin: process.env.CORS_WHITELIST, credentials: true }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(coockieParser());
-
+app.set("trust proxy", 1);
 app.use("/api/user", authRouter);
 app.use("/api/product", productRouter);
 

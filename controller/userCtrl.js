@@ -11,6 +11,7 @@ const createUser = asyncHandler(async (req, res) => {
   if (!findUser) {
     // create a new User
     const newUser = await User.create(req.body);
+
     let findUser = await User.findOne({ email });
     if (findUser && (await findUser.isPasswordMatched(password))) {
       const refreshToken = await generateRefreshToken(newUser?._id);
