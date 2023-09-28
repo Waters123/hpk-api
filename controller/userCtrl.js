@@ -27,6 +27,7 @@ const createUser = asyncHandler(async (req, res) => {
         path: "/",
         maxAge: 72 * 60 * 60 * 1000,
         secure: true,
+        sameSite: "none",
       });
       res.json({
         _id: newUser?._id,
