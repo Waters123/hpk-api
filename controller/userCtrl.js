@@ -28,6 +28,7 @@ const createUser = asyncHandler(async (req, res) => {
         maxAge: 72 * 60 * 60 * 1000,
         secure: true,
         sameSite: "none",
+        domain: ".happykidss.shop",
       });
       res.json({
         _id: newUser?._id,
