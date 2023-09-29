@@ -21,7 +21,6 @@ const createUser = asyncHandler(async (req, res) => {
           $push: {
             refreshToken: {
               token: refreshToken,
-              deviceUID: deviceUID,
             },
           },
         },
@@ -51,7 +50,7 @@ const createUser = asyncHandler(async (req, res) => {
 });
 
 const loginUserCtrl = asyncHandler(async (req, res) => {
-  const { email, password, deviceUID } = req.body;
+  const { email, password } = req.body;
   const findUser = await User.findOne({ email });
   if (findUser && (await findUser.isPasswordMatched(password))) {
     const refreshToken = await generateRefreshToken(findUser?._id);
@@ -61,7 +60,6 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
         $push: {
           refreshToken: {
             token: refreshToken,
-            deviceUID: deviceUID,
           },
         },
       },
@@ -82,8 +80,8 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       path: "/",
       maxAge: 72 * 60 * 60 * 1000,
       secure: true,
-      // sameSite: "none",
-      // domain: ".happykidss.shop",
+      sameSite: "none",
+      domain: ".happykidss.shop",
     });
     res.json({
       _id: findUser?._id,
