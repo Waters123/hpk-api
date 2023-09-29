@@ -42,10 +42,13 @@ var userSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.ObjectId, ref: "Adress" }],
     },
     wishList: [{ type: mongoose.Schema.ObjectId, ref: "Product" }],
-    refreshToken: {
-      type: String,
-      unique: true,
-    },
+    refreshToken: [
+      {
+        token: { type: String, unique: true },
+        deviceUID: { type: String, unique: true },
+        _id: false,
+      },
+    ],
   },
   {
     timestamps: true,

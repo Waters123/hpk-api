@@ -46,22 +46,39 @@ const createUser = asyncHandler(async (req, res) => {
 });
 
 const loginUserCtrl = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, deviceUID } = req.body;
   const findUser = await User.findOne({ email });
   if (findUser && (await findUser.isPasswordMatched(password))) {
     const refreshToken = await generateRefreshToken(findUser?._id);
     const updateUser = await User.findByIdAndUpdate(
       findUser?._id,
       {
-        refreshToken: refreshToken,
+        $push: {
+          refreshToken: {
+            token: refreshToken,
+            deviceUID: deviceUID,
+          },
+        },
       },
       { new: true }
     );
+
+    await User.findByIdAndUpdate(findUser?._id, {
+      $push: {
+        refreshToken: {
+          $each: [],
+          $slice: -3, // Keep the last 3 elements.
+        },
+      },
+    });
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       path: "/",
       maxAge: 72 * 60 * 60 * 1000,
       secure: true,
+      // sameSite: "none",
+      // domain: ".happykidss.shop",
     });
     res.json({
       _id: findUser?._id,
@@ -70,7 +87,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       email: findUser?.email,
       mobile: findUser?.mobile,
       role: findUser?.role,
-      token: generateToken(findUser?._id),
+      token: generateToken(findUser._id),
     });
   } else {
     throw new Error("Ivalid Credentials");
@@ -81,11 +98,22 @@ const handleRefreshToken = asyncHandler(async (req, res, next) => {
   const cookie = req.cookies;
   if (!cookie.refreshToken) throw new Error("No Refresh Token");
   const refreshToken = cookie.refreshToken;
-  const user = await User.findOne({ refreshToken });
+  const user = await User.findOne({
+    refreshToken: { $elemMatch: { token: refreshToken } },
+  }); // find refresh token in array of refreshtoken array
   if (!user) throw new Error("No Refresh token present in Db or not matched");
-  jwt.verify(refreshToken, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(refreshToken, process.env.JWT_SECRET, async (err, decoded) => {
+    // find if there is error and remove refresh token
     if (err || user.id !== decoded.id) {
-      throw new Error("there is something wrong with refresh token");
+      await User.updateOne(
+        { _id: user._id },
+        { $pull: { refreshToken: { token: refreshToken } } }
+      );
+
+      // Return an appropriate response to the client
+      return res
+        .status(401)
+        .json({ error: "There is something wrong with refresh token" });
     }
     const accessToken = generateToken(user?._id);
     res.json({
@@ -105,7 +133,9 @@ const logOut = asyncHandler(async (req, res) => {
   const cookie = req.cookies;
   if (!cookie?.refreshToken) throw new Error("No Refresh Token in Cookies");
   const refreshToken = cookie.refreshToken;
-  const user = await User.findOne({ refreshToken });
+  const user = await User.findOne({
+    refreshToken: { $elemMatch: { token: refreshToken } },
+  }); //
   if (!user) {
     res.clearCookie("refreshToken", {
       httpOnly: true,
@@ -113,12 +143,11 @@ const logOut = asyncHandler(async (req, res) => {
     });
     return res.sendStatus(204); // forbidden
   }
-  await User.findOneAndUpdate(
-    { refreshToken },
-    {
-      refreshToken: "",
-    }
+  await User.updateOne(
+    { _id: user._id },
+    { $pull: { refreshToken: { token: refreshToken } } }
   );
+
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: true,
