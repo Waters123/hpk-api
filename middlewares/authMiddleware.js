@@ -10,7 +10,14 @@ const ROLES = {
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
   let token;
-  if (req?.headers?.authorization?.startsWith("Bearer")) {
+  const cookie = req.cookies;
+  if (!cookie.refreshToken)
+    res.status(403).json({ message: "no refresh token" });
+  const refreshToken = cookie.refreshToken;
+  const user = await User.findOne({
+    refreshToken: { $elemMatch: { token: refreshToken } },
+  });
+  if (user && req?.headers?.authorization?.startsWith("Bearer")) {
     token = req.headers.authorization.split(" ")[1];
     try {
       if (token) {
