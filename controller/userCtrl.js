@@ -18,7 +18,12 @@ const createUser = asyncHandler(async (req, res) => {
       const updateUser = await User.findByIdAndUpdate(
         newUser?._id,
         {
-          refreshToken: refreshToken,
+          $push: {
+            refreshToken: {
+              token: refreshToken,
+              deviceUID: deviceUID,
+            },
+          },
         },
         { new: true }
       );
