@@ -4,12 +4,16 @@ const asyncHandler = require("express-async-handler");
 const validateMongoDbID = require("../utils/validateMongoDb");
 const { generateRefreshToken } = require("../config/refreshToke");
 const jwt = require("jsonwebtoken");
+const sendEmail = require("./emailCtrl");
+const crypto = require("crypto");
 
 const createUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   let findUser = await User.findOne({ email: email });
+
   if (!findUser) {
     // create a new User
+
     const newUser = await User.create(req.body);
 
     let findUser = await User.findOne({ email });
@@ -45,8 +49,45 @@ const createUser = asyncHandler(async (req, res) => {
       });
     }
   } else {
-    throw new Error("User already Exists");
+    res.sendStatus(409);
   }
+});
+
+const createUserVerificationToken = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found with this email");
+  try {
+    const token = await user.createVerificationToken();
+    await user.save();
+    const resetURL = `Hi, Please follow this link to verify User. This link is valid till 10 minutes from now. <a href='http://localhost:3011/auth/verify-user/${token}'>Click Here</>`;
+    const data = {
+      to: email,
+      text: "Hey User",
+      subject: "User Verification",
+      html: resetURL,
+    };
+    sendEmail(data);
+    res.json({ message: "reset link sent" });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const verifyUser = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    verificationToken: hashedToken,
+    verificationTokenExpires: { $gt: Date.now() },
+  });
+  if (!user) throw new Error(" Token Expired, Please try again later");
+  user.verified = true;
+  user.verificationToken = undefined;
+  user.verificationTokenExpires = undefined;
+  await user.save();
+  res.json("user verified");
 });
 
 const loginUserCtrl = asyncHandler(async (req, res) => {
@@ -75,7 +116,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       },
     });
 
-    res.cookie("refreshToken", refreshToken, {
+    await res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       path: "/",
       maxAge: 72 * 60 * 60 * 1000,
@@ -90,6 +131,7 @@ const loginUserCtrl = asyncHandler(async (req, res) => {
       email: findUser?.email,
       mobile: findUser?.mobile,
       role: findUser?.role,
+      verified: findUser?.verified,
       token: generateToken(findUser._id),
     });
   } else {
@@ -127,6 +169,7 @@ const handleRefreshToken = asyncHandler(async (req, res, next) => {
       email: user?.email,
       mobile: user?.mobile,
       role: user?.role,
+      verified: user?.verified,
     });
   });
 });
@@ -146,10 +189,12 @@ const logOut = asyncHandler(async (req, res) => {
     });
     return res.sendStatus(204); // forbidden
   }
-  await User.updateOne(
-    { _id: user._id },
-    { $pull: { refreshToken: { token: refreshToken } } }
-  );
+  if (user.refreshToken.length > 1) {
+    await User.updateOne(
+      { _id: user._id },
+      { $pull: { refreshToken: { token: refreshToken } } }
+    );
+  }
 
   res.clearCookie("refreshToken", {
     httpOnly: true,
@@ -251,6 +296,62 @@ const unBlockUser = asyncHandler(async (req, res) => {
   }
 });
 
+const updatePassword = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { currentPassword, password } = req.body;
+
+  validateMongoDbID(_id);
+  const user = await User.findById(_id);
+  if (password && (await user.isPasswordMatched(currentPassword))) {
+    if (await user.isPasswordMatched(password)) {
+      res.status(406).json({ message: "this password is already in use" });
+    }
+    user.password = password;
+    const updatedPassword = await user.save();
+    res.json({ password: "password updated" });
+  } else {
+    res.status(404).json({ message: "error" });
+  }
+});
+
+const forgotPasswordToken = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) throw new Error("User not found with this email");
+  try {
+    const token = await user.createPasswordResetToken();
+    await user.save();
+    const resetURL = `Hi, Please follow this link to reset Your Password. This link is valid till 10 minutes from now. <a href='http://localhost:3011/auth/reset-password/${token}'>Click Here</>`;
+    const data = {
+      to: email,
+      text: "Hey User",
+      subject: "Forgot Password Link",
+      html: resetURL,
+    };
+    sendEmail(data);
+    res.json({ message: "reset link sent" });
+  } catch (error) {
+    throw new Error(error);
+  }
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  const { token } = req.params;
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: Date.now() },
+  });
+  if (!user) throw new Error(" Token Expired, Please try again later");
+  user.password = password;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+  res.json(user);
+});
+
 module.exports = {
   createUser,
   loginUserCtrl,
@@ -262,4 +363,9 @@ module.exports = {
   unBlockUser,
   handleRefreshToken,
   logOut,
+  updatePassword,
+  forgotPasswordToken,
+  resetPassword,
+  createUserVerificationToken,
+  verifyUser,
 };
