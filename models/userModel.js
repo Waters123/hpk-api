@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 // Declare the Schema of the Mongo model
 var userSchema = new mongoose.Schema(
@@ -45,11 +46,21 @@ var userSchema = new mongoose.Schema(
     refreshToken: [
       {
         token: { type: String, unique: true },
-        deviceUID: { type: String, unique: true },
         _id: false,
       },
     ],
+    verified: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    verificationToken: String,
+    verificationTokenExpires: Date,
+    passwordChangedAt: Date,
+    passwordResetToken: String,
+    passwordResetExpires: Date,
   },
+
   {
     timestamps: true,
   }
@@ -61,6 +72,25 @@ userSchema.pre("save", async function (next) {
 });
 userSchema.methods.isPasswordMatched = async function (enderedPassword) {
   return await bcrypt.compare(enderedPassword, this.password);
+};
+userSchema.methods.createPasswordResetToken = async function () {
+  const resettoken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resettoken)
+    .digest("hex");
+  this.passwordResetExpires = Date.now() + 30 * 60 * 1000; // 10 minutes
+  return resettoken;
+};
+
+userSchema.methods.createVerificationToken = async function () {
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  this.verificationToken = crypto
+    .createHash("sha256")
+    .update(verificationToken)
+    .digest("hex");
+  this.verificationTokenExpires = Date.now() + 30 * 60 * 1000; // 10 minutes
+  return verificationToken;
 };
 
 //Export the model
