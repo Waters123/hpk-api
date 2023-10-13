@@ -60,7 +60,7 @@ const createUserVerificationToken = asyncHandler(async (req, res) => {
   try {
     const token = await user.createVerificationToken();
     await user.save();
-    const resetURL = `Hi, Please follow this link to verify User. This link is valid till 10 minutes from now. <a href='http://localhost:3011/auth/verify-user/${token}'>Click Here</>`;
+    const resetURL = `Hi, Please follow this link to verify User. This link is valid till 10 minutes from now. <a href='${process.env.ORIGIN}/auth/verify-user/${token}'>Click Here</>`;
     const data = {
       to: email,
       text: "Hey User",
@@ -321,7 +321,7 @@ const forgotPasswordToken = asyncHandler(async (req, res) => {
   try {
     const token = await user.createPasswordResetToken();
     await user.save();
-    const resetURL = `Hi, Please follow this link to reset Your Password. This link is valid till 10 minutes from now. <a href='http://localhost:3011/auth/reset-password/${token}'>Click Here</>`;
+    const resetURL = `Hi, Please follow this link to reset Your Password. This link is valid till 10 minutes from now. <a href='${process.env.ORIGIN}/auth/reset-password/${token}'>Click Here</>`;
     const data = {
       to: email,
       text: "Hey User",
