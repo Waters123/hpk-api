@@ -30,7 +30,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
       res.status(403).json({ message: "token expired" });
     }
   } else {
-    throw new Error("there is no token attached to header");
+    res.status(403).json({ message: "there is no token attached to header" });
   }
 });
 
