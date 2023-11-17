@@ -63,13 +63,27 @@ const getAllProducts = asyncHandler(async (req, res) => {
     // Filtering
     const excludedQuery = { ...req.query };
 
-    const excludeFields = ["page", "sort", "limit", "fields", "keyword"]; // Add "keyword" to excluded fields
+    const excludeFields = [
+      "page",
+      "sort",
+      "limit",
+      "fields",
+      "keyword",
+      "category",
+    ]; // Add "keyword" to excluded fields
     excludeFields.forEach((el) => delete excludedQuery[el]);
 
     // Include search based on a keyword
     if (req.query.keyword) {
       excludedQuery.title = {
         $regex: req.query.keyword,
+        $options: "i", // Case-insensitive search
+      };
+    }
+
+    if (req.query.category) {
+      excludedQuery.category = {
+        $regex: req.query.category,
         $options: "i", // Case-insensitive search
       };
     }
